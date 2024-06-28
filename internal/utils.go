@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 )
 
 func GetRecentlyPlayed(accessToken string) error {
@@ -44,45 +45,49 @@ func GetRecentlyPlayed(accessToken string) error {
 	return nil
 }
 
-func GetUserTopItems(accessToken string) error {
-	limit := 50
-	time_range := "long_term"
-	offset := 0
-	TOP_ITEMS_URL := "https://api.spotify.com/v1/me/top/"
-	reqUrl := fmt.Sprintf("%stracks?time_range=%s&limit=%d&offset=%d", TOP_ITEMS_URL, time_range, limit, offset)
+func GetUserTopItems(accessToken, reqUrl string) (SpotifyResponse, error) {
 
 	req, err := http.NewRequest("GET", reqUrl, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %v", err)
+		return SpotifyResponse{}, fmt.Errorf("failed to create request: %v", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to send request: %v", err)
+		return SpotifyResponse{}, fmt.Errorf("failed to send request: %v", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("failed to read response body: %v", err)
+		return SpotifyResponse{}, fmt.Errorf("failed to read response body: %v", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("request failed with status code %d: %s", resp.StatusCode, body)
+		return SpotifyResponse{}, fmt.Errorf("request failed with status code %d: %s", resp.StatusCode, body)
 	}
 
 	var result SpotifyResponse
 	if err := json.Unmarshal([]byte(body), &result); err != nil {
-		return fmt.Errorf("err unmarshaling data")
+		return SpotifyResponse{}, fmt.Errorf("err unmarshaling data")
 	}
 
-	for _, item := range result.Items {
-		fmt.Println(item.Album.Name)
-		fmt.Println(item.Name)
-		fmt.Println()
-	}
+	return result, err
+}
 
+func Write_file(data string) error {
+
+	file, err := os.OpenFile("data.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("%v", err)
+	}
+	defer file.Close()
+
+	_, err = file.Write([]byte(data + "\n"))
+	if err != nil {
+		return fmt.Errorf("%v", err)
+	}
 	return err
 }
