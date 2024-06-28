@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Darth-Tenebros/Melodic-Visions/internal"
+	"github.com/Darth-Tenebros/Melodic-Visions/internal/spotify"
 	"github.com/joho/godotenv"
 )
 
@@ -29,7 +29,7 @@ func main() {
 	TOP_ITEMS_URL := "https://api.spotify.com/v1/me/top/"
 	reqUrl := fmt.Sprintf("%stracks?time_range=%s&limit=%d&offset=%d", TOP_ITEMS_URL, time_range, limit, offset)
 
-	result, err := internal.GetUserTopItems(os.Getenv("ACCESS_TOKEN"), reqUrl)
+	result, err := spotify.GetUserTopItems(os.Getenv("ACCESS_TOKEN"), reqUrl)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -39,7 +39,7 @@ func main() {
 
 		for _, item := range result.Items {
 			time_listened = item.DurationMs + time_listened
-			internal.Write_file(item.Name)
+			spotify.Write_file(fmt.Sprintf("%s <:> %s", item.Name, item.Artists))
 		}
 		fmt.Println("SUCCESS!!")
 
@@ -50,7 +50,7 @@ func main() {
 		fmt.Println(result.Next)
 		if strings.Contains(result.Next, "http") {
 			reqUrl = result.Next
-			result, err = internal.GetUserTopItems(os.Getenv("ACCESS_TOKEN"), reqUrl)
+			result, err = spotify.GetUserTopItems(os.Getenv("ACCESS_TOKEN"), reqUrl)
 		} else {
 			break
 		}
