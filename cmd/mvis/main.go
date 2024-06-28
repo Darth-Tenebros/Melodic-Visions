@@ -1,8 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
+	"strings"
+	"time"
 
 	"github.com/Darth-Tenebros/Melodic-Visions/internal"
 	"github.com/joho/godotenv"
@@ -20,14 +23,42 @@ func main() {
 	// log.Print()
 	// log.Print(val)
 
-	// err := internal.GetRecentlyPlayed(os.Getenv("ACCESS_TOKEN"))
-	// if err != nil {
-	// 	log.Print(err)
-	// }
+	limit := 50
+	time_range := "long_term"
+	offset := 0
+	TOP_ITEMS_URL := "https://api.spotify.com/v1/me/top/"
+	reqUrl := fmt.Sprintf("%stracks?time_range=%s&limit=%d&offset=%d", TOP_ITEMS_URL, time_range, limit, offset)
 
-	err := internal.GetUserTopItems(os.Getenv("ACCESS_TOKEN"))
+	result, err := internal.GetUserTopItems(os.Getenv("ACCESS_TOKEN"), reqUrl)
 	if err != nil {
-		log.Print(err)
+		fmt.Println(err)
 	}
+
+	time_listened := 0
+	for {
+
+		for _, item := range result.Items {
+			time_listened = item.DurationMs + time_listened
+			internal.Write_file(item.Name)
+		}
+		fmt.Println("SUCCESS!!")
+
+		if err != nil {
+			log.Print(err)
+		}
+
+		fmt.Println(result.Next)
+		if strings.Contains(result.Next, "http") {
+			reqUrl = result.Next
+			result, err = internal.GetUserTopItems(os.Getenv("ACCESS_TOKEN"), reqUrl)
+		} else {
+			break
+		}
+	}
+
+	fmt.Println(time_listened)
+	duration := time.Duration(time_listened) * time.Millisecond
+	fmt.Printf("your listened for %f minutes\n", duration.Minutes())
+	fmt.Printf("whch is %f hours", duration.Hours())
 
 }
