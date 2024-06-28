@@ -1,4 +1,4 @@
-package internal
+package model
 
 type SpotifyResponse struct {
 	Next  string `json:"next"`

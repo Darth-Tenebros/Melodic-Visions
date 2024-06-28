@@ -1,4 +1,4 @@
-package internal
+package spotify
 
 import (
 	"encoding/json"
@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"os"
+
+	"github.com/Darth-Tenebros/Melodic-Visions/internal/model"
 )
 
 func GetRecentlyPlayed(accessToken string) error {
@@ -45,33 +47,33 @@ func GetRecentlyPlayed(accessToken string) error {
 	return nil
 }
 
-func GetUserTopItems(accessToken, reqUrl string) (SpotifyResponse, error) {
+func GetUserTopItems(accessToken, reqUrl string) (model.SpotifyResponse, error) {
 
 	req, err := http.NewRequest("GET", reqUrl, nil)
 	if err != nil {
-		return SpotifyResponse{}, fmt.Errorf("failed to create request: %v", err)
+		return model.SpotifyResponse{}, fmt.Errorf("failed to create request: %v", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return SpotifyResponse{}, fmt.Errorf("failed to send request: %v", err)
+		return model.SpotifyResponse{}, fmt.Errorf("failed to send request: %v", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return SpotifyResponse{}, fmt.Errorf("failed to read response body: %v", err)
+		return model.SpotifyResponse{}, fmt.Errorf("failed to read response body: %v", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return SpotifyResponse{}, fmt.Errorf("request failed with status code %d: %s", resp.StatusCode, body)
+		return model.SpotifyResponse{}, fmt.Errorf("request failed with status code %d: %s", resp.StatusCode, body)
 	}
 
-	var result SpotifyResponse
+	var result model.SpotifyResponse
 	if err := json.Unmarshal([]byte(body), &result); err != nil {
-		return SpotifyResponse{}, fmt.Errorf("err unmarshaling data")
+		return model.SpotifyResponse{}, fmt.Errorf("err unmarshaling data")
 	}
 
 	return result, err
