@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"sort"
 	"strings"
-	"time"
 
-	charts "github.com/Darth-Tenebros/Melodic-Visions/internal/charts"
 	model "github.com/Darth-Tenebros/Melodic-Visions/internal/model"
+	render_charts "github.com/Darth-Tenebros/Melodic-Visions/internal/render_charts"
 	"github.com/Darth-Tenebros/Melodic-Visions/internal/spotify"
+	"github.com/go-echarts/go-echarts/v2/charts"
+	"github.com/go-echarts/go-echarts/v2/opts"
 	"github.com/joho/godotenv"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -28,7 +28,7 @@ func main() {
 	// log.Print(val)
 
 	limit := 50
-	time_range := "long_term"
+	time_range := "short_term"
 	offset := 0
 	TOP_ITEMS_URL := "https://api.spotify.com/v1/me/top/"
 	reqUrl := fmt.Sprintf("%stracks?time_range=%s&limit=%d&offset=%d", TOP_ITEMS_URL, time_range, limit, offset)
@@ -72,21 +72,60 @@ func main() {
 	// 	}
 	// }
 
-	top := charts.AggregateArtistTotalDurationListened(tracks)
+	top := render_charts.AggregateArtistTotalDurationListened(tracks)
 
-	var topTen []ArtistDuration
-	for k, v := range top {
-		topTen = append(topTen, ArtistDuration{ArtistName: k, ArtiDuration: v})
+	// var topTen []ArtistDuration
+	// for k, v := range top {
+	// 	topTen = append(topTen, ArtistDuration{ArtistName: k, ArtiDuration: v})
+	// }
+
+	// keys := make([]string, len(topTen))
+	// values := make([]int, len(topTen))
+	var keys []string
+	var values []int
+
+	end := 0
+	for key, value := range top {
+		end++
+		keys = append(keys, key)
+		values = append(values, value)
+		if end == 20 {
+			break
+		}
 	}
 
-	sort.Slice(topTen, func(i, j int) bool {
-		return topTen[i].ArtiDuration > topTen[j].ArtiDuration
-	})
+	bar := barBasic(keys, values)
+	f, _ := os.Create("bar.html")
+	bar.Render(f)
 
-	for i := 0; i < 15; i++ {
-		duration := time.Duration(topTen[i].ArtiDuration) * time.Millisecond
-		fmt.Printf("%s ==> %v\n", topTen[i].ArtistName, duration.Minutes())
+	// sort.Slice(topTen, func(i, j int) bool {
+	// 	return topTen[i].ArtiDuration > topTen[j].ArtiDuration
+	// })
+
+	// for i := 0; i < 15; i++ {
+	// 	duration := time.Duration(topTen[i].ArtiDuration) * time.Millisecond
+	// 	fmt.Printf("%s ==> %v\n", topTen[i].ArtistName, duration.Minutes())
+	// }
+}
+
+// TODO: CLEAN UP RENDERING
+func generateBarItems(values []int) []opts.BarData {
+	items := make([]opts.BarData, 0)
+	for i := 0; i < len(values); i++ {
+		items = append(items, opts.BarData{Value: values[i]})
 	}
+	return items
+}
+
+func barBasic(keys []string, values []int) *charts.Bar {
+	bar := charts.NewBar()
+	bar.SetGlobalOptions(
+		charts.WithTitleOpts(opts.Title{Title: "basic bar example", Subtitle: "This is the subtitle."}),
+	)
+
+	bar.SetXAxis(keys).
+		AddSeries("Category A", generateBarItems(values))
+	return bar
 }
 
 func convertItemToTrack(item model.Item) model.Track {
