@@ -1,15 +1,15 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
+	charts "github.com/Darth-Tenebros/Melodic-Visions/internal/charts"
 	model "github.com/Darth-Tenebros/Melodic-Visions/internal/model"
-	repository "github.com/Darth-Tenebros/Melodic-Visions/internal/repository"
 	"github.com/Darth-Tenebros/Melodic-Visions/internal/spotify"
 	"github.com/joho/godotenv"
 	_ "github.com/mattn/go-sqlite3"
@@ -38,15 +38,15 @@ func main() {
 		fmt.Println(err)
 	}
 
-	database, err := sql.Open("sqlite3", "/home/yolisa/Documents/Projects/Melodic-Visions/data/spotify_data")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer database.Close()
+	// database, err := sql.Open("sqlite3", "/home/yolisa/Documents/Projects/Melodic-Visions/data/spotify_data")
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// defer database.Close()
 
-	track_repo := repository.NewTrackRepository(database)
+	// track_repo := repository.NewTrackRepository(database)
 
-	time_listened := 0
+	// time_listened := 0
 	var tracks []model.Track
 	for {
 
@@ -56,9 +56,7 @@ func main() {
 		if err != nil {
 			log.Print(err)
 		}
-		fmt.Println("SUCCESS")
 
-		fmt.Println(result.Next)
 		if strings.Contains(result.Next, "http") {
 			reqUrl = result.Next
 			result, err = spotify.GetUserTopItems(os.Getenv("ACCESS_TOKEN"), reqUrl)
@@ -67,18 +65,28 @@ func main() {
 		}
 	}
 
-	for _, track := range tracks {
-		_, err := track_repo.InsertTrack("long_term", track)
-		if err != nil {
-			fmt.Println(err)
-		}
+	// for _, track := range tracks {
+	// 	_, err := track_repo.InsertTrack("long_term", track)
+	// 	if err != nil {
+	// 		fmt.Println(err)
+	// 	}
+	// }
+
+	top := charts.AggregateArtistTotalDurationListened(tracks)
+
+	var topTen []ArtistDuration
+	for k, v := range top {
+		topTen = append(topTen, ArtistDuration{ArtistName: k, ArtiDuration: v})
 	}
 
-	fmt.Println(time_listened)
-	duration := time.Duration(time_listened) * time.Millisecond
-	fmt.Printf("your listened for %f minutes\n", duration.Minutes())
-	fmt.Printf("whch is %f hours", duration.Hours())
+	sort.Slice(topTen, func(i, j int) bool {
+		return topTen[i].ArtiDuration > topTen[j].ArtiDuration
+	})
 
+	for i := 0; i < 15; i++ {
+		duration := time.Duration(topTen[i].ArtiDuration) * time.Millisecond
+		fmt.Printf("%s ==> %v\n", topTen[i].ArtistName, duration.Minutes())
+	}
 }
 
 func convertItemToTrack(item model.Item) model.Track {
@@ -101,4 +109,9 @@ func convertItemsToTracks(items []model.Item) []model.Track {
 		tracks[i] = convertItemToTrack(item)
 	}
 	return tracks
+}
+
+type ArtistDuration struct {
+	ArtistName   string
+	ArtiDuration int
 }
