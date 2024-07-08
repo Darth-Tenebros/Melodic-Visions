@@ -9,9 +9,17 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
-func refreshAccessToken(CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN string) (string, error) {
+type TokenResponse struct {
+	AccessToken string `json:"access_token"`
+	TokenType   string `json:"token_type"`
+	ExpiresIn   int    `json:"expires_in"`
+	Scope       string `json:"scope"`
+}
+
+func refreshAccessToken(CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN string) (string, time.Time, error) {
 	// Encode credentials
 	TOKEN_URL := "https://accounts.spotify.com/api/token"
 
@@ -27,7 +35,7 @@ func refreshAccessToken(CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN string) (string,
 	req, err := http.NewRequest("POST", TOKEN_URL, strings.NewReader(data.Encode()))
 	log.Print(req.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to create request: %v", err)
+		return "", time.Time{}, fmt.Errorf("failed to create request: %v", err)
 	}
 	req.Header.Set("Authorization", "Basic "+encodedCredentials)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -36,26 +44,25 @@ func refreshAccessToken(CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN string) (string,
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("failed to send request: %v", err)
+		return "", time.Time{}, fmt.Errorf("failed to send request: %v", err)
 	}
 	defer resp.Body.Close()
 
 	// Read response
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read response body: %v", err)
+		return "", time.Time{}, fmt.Errorf("failed to read response body: %v", err)
 	}
 
 	// Parse JSON response to extract access token
-	var responseMap map[string]interface{}
+	var responseMap TokenResponse
 	if err := json.Unmarshal(body, &responseMap); err != nil {
-		return "", fmt.Errorf("failed to unmarshal response: %v", err)
+		return "", time.Time{}, fmt.Errorf("failed to unmarshal response: %v", err)
 	}
 
-	accessToken, ok := responseMap["access_token"].(string)
-	if !ok {
-		return "", fmt.Errorf("failed to retrieve access token from response")
-	}
+	accessToken := responseMap.AccessToken
 
-	return accessToken, nil
+	newExpiry := time.Now().Add(time.Duration(responseMap.ExpiresIn) * time.Second)
+
+	return accessToken, newExpiry, nil
 }
