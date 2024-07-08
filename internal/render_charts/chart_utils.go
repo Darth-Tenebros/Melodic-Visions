@@ -2,16 +2,16 @@ package render_charts
 
 import "github.com/Darth-Tenebros/Melodic-Visions/internal/model"
 
-func AggregateArtistTotalDurationListened(tracks []model.Track) map[string]int {
+func AggregateArtistTotalTracks(tracks []model.Track) map[string]int {
 	top := make(map[string]int)
 
 	for _, track := range tracks {
 
 		_, ok := top[track.ArtistName]
 		if ok {
-			top[track.ArtistName] = top[track.ArtistName] + track.Duration
+			top[track.ArtistName] = top[track.ArtistName] + 1
 		} else {
-			top[track.ArtistName] = track.Duration
+			top[track.ArtistName] = 1
 		}
 	}
 
