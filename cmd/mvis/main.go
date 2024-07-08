@@ -4,28 +4,53 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
+	"sort"
 	"strings"
+	"time"
 
 	model "github.com/Darth-Tenebros/Melodic-Visions/internal/model"
-	render_charts "github.com/Darth-Tenebros/Melodic-Visions/internal/render_charts"
+	"github.com/Darth-Tenebros/Melodic-Visions/internal/render_charts"
 	"github.com/Darth-Tenebros/Melodic-Visions/internal/spotify"
-	"github.com/go-echarts/go-echarts/v2/charts"
-	"github.com/go-echarts/go-echarts/v2/opts"
 	"github.com/joho/godotenv"
 	_ "github.com/mattn/go-sqlite3"
+)
+
+const (
+	refreshToken = "REFRESH_TOKEN"
+	tokenEnvVar  = "ACCESS_TOKEN"
+	expiryEnvVar = "TOKEN_EXPIRY"
 )
 
 func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Print(err)
 	}
-	// TODO: FIGURE OUT A WAY TO DO THIS PROGRAMATICALLY (WRITE TO ENV)
-	// val, err := refreshAccessToken(os.Getenv("CLIENT_ID"), os.Getenv("CLIENT_SECRET"), os.Getenv("REFRESH_TOKEN"))
-	// if err != nil {
-	// 	log.Print("err getting token" + err.Error())
-	// }
-	// log.Print()
-	// log.Print(val)
+
+	// check if the the current token has expired
+	expiryStr := os.Getenv(expiryEnvVar)
+	fmt.Println(expiryStr)
+
+	expiry, err := time.Parse(time.RFC3339, expiryStr)
+	if err != nil {
+		fmt.Println("Invalid expiry time:", err)
+		return
+	}
+
+	duration := time.Now().Sub(expiry)
+	if duration > time.Hour {
+		fmt.Println("Token expired, refreshing...")
+		newToken, newExpiry, err := refreshAccessToken(os.Getenv("CLIENT_ID"), os.Getenv("CLIENT_SECRET"), os.Getenv("REFRESH_TOKEN"))
+		if err != nil {
+			fmt.Printf("Error refreshing token: %v \n", err)
+			return
+		}
+
+		err = updateEnvToken(newToken, newExpiry)
+		if err != nil {
+			fmt.Printf("Error updating environment variables: %v", err)
+		}
+	}
 
 	limit := 50
 	time_range := "short_term"
@@ -33,20 +58,13 @@ func main() {
 	TOP_ITEMS_URL := "https://api.spotify.com/v1/me/top/"
 	reqUrl := fmt.Sprintf("%stracks?time_range=%s&limit=%d&offset=%d", TOP_ITEMS_URL, time_range, limit, offset)
 
+	// request Top User Items (tracks) from spotify
 	result, err := spotify.GetUserTopItems(os.Getenv("ACCESS_TOKEN"), reqUrl)
 	if err != nil {
 		fmt.Println(err)
 	}
 
-	// database, err := sql.Open("sqlite3", "/home/yolisa/Documents/Projects/Melodic-Visions/data/spotify_data")
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// defer database.Close()
-
-	// track_repo := repository.NewTrackRepository(database)
-
-	// time_listened := 0
+	// paginate through results
 	var tracks []model.Track
 	for {
 
@@ -59,73 +77,88 @@ func main() {
 
 		if strings.Contains(result.Next, "http") {
 			reqUrl = result.Next
-			result, err = spotify.GetUserTopItems(os.Getenv("ACCESS_TOKEN"), reqUrl)
+			result, err = spotify.GetUserTopItems(os.Getenv(tokenEnvVar), reqUrl)
 		} else {
 			break
 		}
 	}
 
 	// for _, track := range tracks {
-	// 	_, err := track_repo.InsertTrack("long_term", track)
-	// 	if err != nil {
-	// 		fmt.Println(err)
-	// 	}
+	// 	appendToFile("data.txt", track.ArtistName+"\n")
 	// }
 
-	top := render_charts.AggregateArtistTotalDurationListened(tracks)
+	// get the number od tracks by each artist
+	songsPerArtist := render_charts.AggregateArtistTotalTracks(tracks)
 
-	// var topTen []ArtistDuration
-	// for k, v := range top {
-	// 	topTen = append(topTen, ArtistDuration{ArtistName: k, ArtiDuration: v})
-	// }
+	topten := top10FromMap(songsPerArtist)
 
-	// keys := make([]string, len(topTen))
-	// values := make([]int, len(topTen))
 	var keys []string
 	var values []int
 
 	end := 0
-	for key, value := range top {
+	for key, value := range topten {
 		end++
 		keys = append(keys, key)
 		values = append(values, value)
-		if end == 20 {
-			break
-		}
+		// if end == 10 {
+		// 	break
+		// }
 	}
 
-	bar := barBasic(keys, values)
+	bar := render_charts.BarBasic(keys, values)
 	f, _ := os.Create("bar.html")
 	bar.Render(f)
 
-	// sort.Slice(topTen, func(i, j int) bool {
-	// 	return topTen[i].ArtiDuration > topTen[j].ArtiDuration
-	// })
-
-	// for i := 0; i < 15; i++ {
-	// 	duration := time.Duration(topTen[i].ArtiDuration) * time.Millisecond
-	// 	fmt.Printf("%s ==> %v\n", topTen[i].ArtistName, duration.Minutes())
-	// }
 }
 
-// TODO: CLEAN UP RENDERING
-func generateBarItems(values []int) []opts.BarData {
-	items := make([]opts.BarData, 0)
-	for i := 0; i < len(values); i++ {
-		items = append(items, opts.BarData{Value: values[i]})
+func appendToFile(filename string, text string) error {
+	// Open the file with O_APPEND and O_WRONLY flags
+	file, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open file: %w", err)
 	}
-	return items
+	defer file.Close()
+
+	// Write the text to the file
+	_, err = file.WriteString(text)
+	if err != nil {
+		return fmt.Errorf("failed to write to file: %w", err)
+	}
+
+	return nil
 }
 
-func barBasic(keys []string, values []int) *charts.Bar {
-	bar := charts.NewBar()
-	bar.SetGlobalOptions(
-		charts.WithTitleOpts(opts.Title{Title: "basic bar example", Subtitle: "This is the subtitle."}),
-	)
+func top10FromMap(input map[string]int) map[string]int {
+	// Create a slice to hold the key-value pairs
+	var kvSlice []ArtistDuration
+	for k, v := range input {
+		kvSlice = append(kvSlice, ArtistDuration{k, v})
+	}
 
-	bar.SetXAxis(keys).
-		AddSeries("Category A", generateBarItems(values))
-	return bar
+	// Sort the slice based on the values in descending order
+	sort.Slice(kvSlice, func(i, j int) bool {
+		return kvSlice[i].ArtistCount > kvSlice[j].ArtistCount
+	})
+
+	// Create a map to hold the top 10 key-value pairs
+	top10Map := make(map[string]int)
+	for i := 0; i < len(kvSlice) && i < 10; i++ {
+		top10Map[kvSlice[i].ArtistName] = kvSlice[i].ArtistCount
+	}
+
+	return top10Map
+}
+
+func updateEnvToken(newToken string, newExpiry time.Time) error {
+	cmd := fmt.Sprintf("export %s=%s; export %s=%s", tokenEnvVar, newToken, expiryEnvVar, newExpiry.Format(time.RFC3339))
+	_, err := exec.Command("sh", "-c", cmd).Output()
+	if err != nil {
+		return fmt.Errorf("failed to update environment variable: %v", err)
+	}
+
+	os.Setenv(tokenEnvVar, newToken)
+	os.Setenv(expiryEnvVar, newExpiry.Format(time.RFC3339))
+	return nil
 }
 
 func convertItemToTrack(item model.Item) model.Track {
@@ -151,6 +184,6 @@ func convertItemsToTracks(items []model.Item) []model.Track {
 }
 
 type ArtistDuration struct {
-	ArtistName   string
-	ArtiDuration int
+	ArtistName  string
+	ArtistCount int
 }
