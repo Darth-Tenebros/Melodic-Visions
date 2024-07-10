@@ -109,6 +109,10 @@ func main() {
 	f, _ := os.Create("bar.html")
 	bar.Render(f)
 
+	pie := render_charts.PieBasic(topten)
+	f, _ = os.Create("pie.html")
+	pie.Render(f)
+
 }
 
 func appendToFile(filename string, text string) error {
