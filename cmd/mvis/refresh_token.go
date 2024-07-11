@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -33,7 +32,6 @@ func refreshAccessToken(CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN string) (string,
 
 	// Prepare request
 	req, err := http.NewRequest("POST", TOKEN_URL, strings.NewReader(data.Encode()))
-	log.Print(req.Body)
 	if err != nil {
 		return "", time.Time{}, fmt.Errorf("failed to create request: %v", err)
 	}
