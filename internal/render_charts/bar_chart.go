@@ -5,7 +5,6 @@ import (
 	"github.com/go-echarts/go-echarts/v2/opts"
 )
 
-// TODO: CLEAN UP RENDERING
 func generateBarItems(values []int) []opts.BarData {
 	items := make([]opts.BarData, 0)
 	for i := 0; i < len(values); i++ {
@@ -21,6 +20,6 @@ func BarBasic(keys []string, values []int) *charts.Bar {
 	)
 
 	bar.SetXAxis(keys).
-		AddSeries("Category A", generateBarItems(values))
+		AddSeries("Artists", generateBarItems(values))
 	return bar
 }
