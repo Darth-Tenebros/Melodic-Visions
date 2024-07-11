@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/Darth-Tenebros/Melodic-Visions/internal/model"
 )
@@ -77,6 +78,44 @@ func GetUserTopItems(accessToken, reqUrl string) (model.SpotifyResponse, error) 
 	}
 
 	return result, err
+}
+
+func GetAudioFeatures(accessToken string, tracksIds []string) (model.AudioFeatures, error) {
+
+	ids := strings.Join(tracksIds, ",")
+
+	GET_AUDIO_FEATURES_URL := "https://api.spotify.com/v1/audio-features?ids"
+	fullUrl := fmt.Sprintf("%s=%s", GET_AUDIO_FEATURES_URL, ids)
+
+	req, err := http.NewRequest("GET", fullUrl, nil)
+	if err != nil {
+		return model.AudioFeatures{}, fmt.Errorf("error setting up request for audio features: %v", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return model.AudioFeatures{}, fmt.Errorf("error getting audio features: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return model.AudioFeatures{}, fmt.Errorf("failed to read response body: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return model.AudioFeatures{}, fmt.Errorf("request failed with status code %d: %s", resp.StatusCode, body)
+	}
+
+	var result model.AudioFeatures
+	if err := json.Unmarshal([]byte(body), &result); err != nil {
+		return model.AudioFeatures{}, fmt.Errorf("err unmarshaling data")
+	}
+
+	return result, nil
 }
 
 func Write_file(data string) error {
