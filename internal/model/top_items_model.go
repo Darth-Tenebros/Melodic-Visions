@@ -12,6 +12,7 @@ type Item struct {
 	Name       string   `json:"name"`
 	Artists    []Artist `json:"artists"`
 	DurationMs int      `json:"duration_ms"`
+	Id         string   `json:"id"`
 }
 
 type Artist struct {
