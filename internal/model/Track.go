@@ -5,4 +5,5 @@ type Track struct {
 	AlbumName  string
 	Duration   int
 	ArtistName string
+	Id         string
 }
