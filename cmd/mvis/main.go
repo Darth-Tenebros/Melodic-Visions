@@ -66,10 +66,12 @@ func main() {
 
 	// paginate through results
 	var tracks []model.Track
+	var tracksIds []string
 	for {
 
-		data := convertItemsToTracks(result.Items)
+		data, ids := convertItemsToTracks(result.Items)
 		tracks = append(tracks, data...)
+		tracksIds = append(tracksIds, ids...)
 
 		if err != nil {
 			log.Print(err)
@@ -82,10 +84,6 @@ func main() {
 			break
 		}
 	}
-
-	// for _, track := range tracks {
-	// 	appendToFile("data.txt", track.ArtistName+"\n")
-	// }
 
 	// get the number od tracks by each artist
 	songsPerArtist := render_charts.AggregateArtistTotalTracks(tracks)
@@ -105,6 +103,14 @@ func main() {
 		// }
 	}
 
+	audioFeatures, err := paginateAudioFeatures(os.Getenv(tokenEnvVar), tracksIds)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	acousticness, danceability, valence := retrieveAudioFeatures(audioFeatures)
+
+	// render graphs
 	bar := render_charts.BarBasic(keys, values)
 	f, _ := os.Create("bar.html")
 	bar.Render(f)
@@ -113,6 +119,34 @@ func main() {
 	f, _ = os.Create("pie.html")
 	pie.Render(f)
 
+	scatter := render_charts.ScatterBasic(tracksIds, acousticness, danceability, valence)
+	f, _ = os.Create("scatter.html")
+	scatter.Render(f)
+
+}
+
+func paginateAudioFeatures(accessToken string, trackids []string) ([]model.AudioFeature, error) {
+	iter := 100
+	var audio_features []model.AudioFeature
+
+	for i := 0; i < len(trackids); i += iter {
+		end := i + iter
+		if end > len(trackids) {
+			end = len(trackids)
+		}
+
+		batch := trackids[i:end]
+		result, err := spotify.GetAudioFeatures(accessToken, batch)
+		if err != nil {
+			log.Print(err)
+			return nil, err
+		}
+
+		audio_features = append(audio_features, result.AudioFeatures...)
+
+	}
+
+	return audio_features, nil
 }
 
 func appendToFile(filename string, text string) error {
@@ -176,15 +210,32 @@ func convertItemToTrack(item model.Item) model.Track {
 		AlbumName:  item.Album.Name,
 		Duration:   item.DurationMs,
 		ArtistName: artistName,
+		Id:         item.Id,
 	}
 }
 
-func convertItemsToTracks(items []model.Item) []model.Track {
+func convertItemsToTracks(items []model.Item) ([]model.Track, []string) {
 	tracks := make([]model.Track, len(items))
+	trackIds := make([]string, len(items))
 	for i, item := range items {
 		tracks[i] = convertItemToTrack(item)
+		trackIds[i] = tracks[i].Id
 	}
-	return tracks
+	return tracks, trackIds
+}
+
+func retrieveAudioFeatures(items []model.AudioFeature) ([]float64, []float64, []float64) {
+	var acousticness []float64
+	var danceability []float64
+	var valence []float64
+
+	for _, feature := range items {
+		acousticness = append(acousticness, feature.Acousticness)
+		danceability = append(danceability, feature.Danceability)
+		valence = append(valence, feature.Valence)
+	}
+
+	return acousticness, danceability, valence
 }
 
 type ArtistDuration struct {
