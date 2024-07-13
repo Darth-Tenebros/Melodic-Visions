@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"sort"
-	"strings"
 	"time"
 
 	model "github.com/Darth-Tenebros/Melodic-Visions/internal/model"
@@ -20,6 +19,8 @@ const (
 	refreshToken = "REFRESH_TOKEN"
 	tokenEnvVar  = "ACCESS_TOKEN"
 	expiryEnvVar = "TOKEN_EXPIRY"
+
+	time_range = "short_term"
 )
 
 func main() {
@@ -52,37 +53,10 @@ func main() {
 		}
 	}
 
-	limit := 50
-	time_range := "short_term"
-	offset := 0
-	TOP_ITEMS_URL := "https://api.spotify.com/v1/me/top/"
-	reqUrl := fmt.Sprintf("%stracks?time_range=%s&limit=%d&offset=%d", TOP_ITEMS_URL, time_range, limit, offset)
-
 	// request Top User Items (tracks) from spotify
-	result, err := spotify.GetUserTopItems(os.Getenv("ACCESS_TOKEN"), reqUrl)
+	tracks, trackIds, err := spotify.GetTopTracks(time_range, os.Getenv(tokenEnvVar))
 	if err != nil {
 		fmt.Println(err)
-	}
-
-	// paginate through results
-	var tracks []model.Track
-	var tracksIds []string
-	for {
-
-		data, ids := convertItemsToTracks(result.Items)
-		tracks = append(tracks, data...)
-		tracksIds = append(tracksIds, ids...)
-
-		if err != nil {
-			log.Print(err)
-		}
-
-		if strings.Contains(result.Next, "http") {
-			reqUrl = result.Next
-			result, err = spotify.GetUserTopItems(os.Getenv(tokenEnvVar), reqUrl)
-		} else {
-			break
-		}
 	}
 
 	// get the number od tracks by each artist
@@ -103,7 +77,7 @@ func main() {
 		// }
 	}
 
-	audioFeatures, err := paginateAudioFeatures(os.Getenv(tokenEnvVar), tracksIds)
+	audioFeatures, err := paginateAudioFeatures(os.Getenv(tokenEnvVar), trackIds)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -119,7 +93,7 @@ func main() {
 	f, _ = os.Create("pie.html")
 	pie.Render(f)
 
-	scatter := render_charts.ScatterBasic(tracksIds, acousticness, danceability, valence)
+	scatter := render_charts.ScatterBasic(trackIds, acousticness, danceability, valence)
 	f, _ = os.Create("scatter.html")
 	scatter.Render(f)
 
@@ -197,31 +171,6 @@ func updateEnvToken(newToken string, newExpiry time.Time) error {
 	os.Setenv(tokenEnvVar, newToken)
 	os.Setenv(expiryEnvVar, newExpiry.Format(time.RFC3339))
 	return nil
-}
-
-func convertItemToTrack(item model.Item) model.Track {
-	artistName := ""
-	if len(item.Artists) > 0 {
-		artistName = item.Artists[0].Name
-	}
-
-	return model.Track{
-		TrackName:  item.Name,
-		AlbumName:  item.Album.Name,
-		Duration:   item.DurationMs,
-		ArtistName: artistName,
-		Id:         item.Id,
-	}
-}
-
-func convertItemsToTracks(items []model.Item) ([]model.Track, []string) {
-	tracks := make([]model.Track, len(items))
-	trackIds := make([]string, len(items))
-	for i, item := range items {
-		tracks[i] = convertItemToTrack(item)
-		trackIds[i] = tracks[i].Id
-	}
-	return tracks, trackIds
 }
 
 func retrieveAudioFeatures(items []model.AudioFeature) ([]float64, []float64, []float64) {
