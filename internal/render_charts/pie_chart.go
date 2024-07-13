@@ -5,7 +5,7 @@ import (
 	"github.com/go-echarts/go-echarts/v2/opts"
 )
 
-func generatePieItems(data map[string]int) []opts.PieData {
+func generatePieItems(data map[string]interface{}) []opts.PieData {
 	items := make([]opts.PieData, 0)
 	for key, value := range data {
 		items = append(items, opts.PieData{Name: key, Value: value})
@@ -13,7 +13,7 @@ func generatePieItems(data map[string]int) []opts.PieData {
 	return items
 }
 
-func PieBasic(data map[string]int) *charts.Pie {
+func PieBasic(data map[string]interface{}) *charts.Pie {
 	pie := charts.NewPie()
 	pie.SetGlobalOptions(
 		charts.WithTitleOpts(opts.Title{Title: "basic pie example"}),
