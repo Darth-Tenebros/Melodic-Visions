@@ -7,3 +7,8 @@ type Track struct {
 	ArtistName string
 	Id         string
 }
+
+type ArtistDuration struct {
+	ArtistName  string
+	ArtistCount int
+}
