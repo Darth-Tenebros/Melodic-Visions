@@ -25,6 +25,7 @@ func WordCloudBasic(data map[string]interface{}) *charts.WordCloud {
 			charts.WithWorldCloudChartOpts(
 				opts.WordCloudChart{
 					SizeRange: []float32{14, 80},
+					Shape:     "star",
 				}),
 		)
 	return wc

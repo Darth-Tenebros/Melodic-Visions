@@ -109,7 +109,7 @@ func top10FromMap(input map[string]int) map[string]interface{} {
 
 	// Create a map to hold the top 10 key-value pairs
 	top10Map := make(map[string]interface{})
-	for i := 0; i < len(kvSlice) && i < 20; i++ {
+	for i := 0; i < len(kvSlice) && i < 15; i++ {
 		top10Map[kvSlice[i].ArtistName] = kvSlice[i].ArtistCount
 	}
 
